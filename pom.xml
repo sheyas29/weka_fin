@@ -23,6 +23,34 @@
       <artifactId>weka-stable</artifactId>
       <version>3.8.6</version>
     </dependency>
+
+   <!-- https://mvnrepository.com/artifact/com.formdev/flatlaf-extras -->
+<dependency>
+    <groupId>com.formdev</groupId>
+    <artifactId>flatlaf-extras</artifactId>
+    <version>3.4.1</version>
+    <scope>runtime</scope>
+</dependency>
+<!-- https://mvnrepository.com/artifact/com.formdev/flatlaf -->
+<dependency>
+    <groupId>com.formdev</groupId>
+    <artifactId>flatlaf</artifactId>
+    <version>3.4.1</version>
+    <scope>runtime</scope>
+</dependency>
+<!-- https://mvnrepository.com/artifact/com.formdev/flatlaf-swingx -->
+<dependency>
+    <groupId>com.formdev</groupId>
+    <artifactId>flatlaf-swingx</artifactId>
+    <version>3.4.1</version>
+</dependency>
+
+
+    <dependency>
+    <groupId>com.github.lgooddatepicker</groupId>
+    <artifactId>LGoodDatePicker</artifactId>
+    <version>11.2.1</version> </dependency>
+
     <dependency>
       <groupId>org.jfree</groupId>
       <artifactId>jfreechart</artifactId>
@@ -48,6 +76,12 @@
       <artifactId>javafx-fxml</artifactId>
       <version>23-ea+3</version>
     </dependency>
+    <dependency>
+    <groupId>com.formdev</groupId>
+    <artifactId>flatlaf</artifactId>
+    <version>2.4</version>
+</dependency>
+
     <dependency>
       <groupId>org.openjfx</groupId>
       <artifactId>javafx-swing</artifactId>
