@@ -3,9 +3,11 @@ import weka.classifiers.trees.J48;
 import com.formdev.flatlaf.FlatLightLaf;
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
-import com.privatejgoodies.forms.factories.CC;
-import com.privatejgoodies.forms.layout.FormLayout;
+
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 import java.io.File;
@@ -15,13 +17,16 @@ import weka.gui.visualize.PlotData2D;
 import weka.gui.visualize.VisualizePanel;
 
 public class ChatbotApp extends JFrame {
-    private JTextArea chatArea;
+    private JPanel chatPanel;
+    private JScrollPane scrollPane;
     private JTextField inputField;
     private JButton sendButton;
     private J48 j48Classifier;
     private Instances data;
     private static final Color PRIMARY_COLOR = new Color(52, 152, 219);
     private static final Color SECONDARY_COLOR = new Color(44, 62, 80);
+    private static final Color USER_MESSAGE_COLOR = new Color(135, 206, 250); // Light Blue
+    private static final Color BOT_MESSAGE_COLOR = new Color(240, 240, 240); // Light Gray
     private static final String[] COMMANDS = {
             "visualize dataset",
             "statistics for all columns",
@@ -86,12 +91,11 @@ public class ChatbotApp extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        chatArea = new JTextArea();
-        chatArea.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        chatArea.setLineWrap(true);
-        chatArea.setWrapStyleWord(true);
+        chatPanel = new JPanel();
+        chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
+        chatPanel.setBackground(Color.WHITE);
 
-        JScrollPane scrollPane = new JScrollPane(chatArea);
+        scrollPane = new JScrollPane(chatPanel);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         add(scrollPane, BorderLayout.CENTER);
 
@@ -142,10 +146,11 @@ public class ChatbotApp extends JFrame {
     private void processUserInput() {
         String userInput = inputField.getText().trim().toLowerCase();
         inputField.setText("");
-        chatArea.append("You: " + userInput + "\n");
+        addMessageToChat(userInput, true);
+
         String command = getClosestCommand(userInput);
         if (command == null) {
-            chatArea.append("Bot: Command not recognized. Please try again.\n");
+            addMessageToChat("Command not recognized. Please try again.", false);
             return;
         }
         switch (command) {
@@ -165,7 +170,61 @@ public class ChatbotApp extends JFrame {
                 compareDatasets();
                 break;
             default:
-                chatArea.append("Bot: Invalid command.\n");
+                addMessageToChat("Invalid command.", false);
+        }
+    }
+
+    private void addMessageToChat(String message, boolean isUser) {
+        JPanel messagePanel = new JPanel();
+        messagePanel.setLayout(new BoxLayout(messagePanel, BoxLayout.Y_AXIS));
+        messagePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        messagePanel.setBackground(isUser ? USER_MESSAGE_COLOR : BOT_MESSAGE_COLOR);
+
+        JLabel messageLabel = new JLabel("<html><p style='width: 400px;'>" + message + "</p></html>");
+        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        messageLabel.setForeground(Color.BLACK);
+
+        messagePanel.add(messageLabel);
+        chatPanel.add(messagePanel);
+        chatPanel.revalidate();
+        scrollPane.getVerticalScrollBar().setValue(scrollPane.getVerticalScrollBar().getMaximum());
+    }
+
+    private void addTableToChat(String[][] data, String[] columnNames) {
+        DefaultTableModel tableModel = new DefaultTableModel(data, columnNames);
+        JTable table = new JTable(tableModel);
+        styleTable(table);
+
+        // Calculate the preferred height of the table
+        int tableHeight = table.getRowHeight() * table.getRowCount() + table.getTableHeader().getPreferredSize().height;
+
+        JScrollPane tableScrollPane = new JScrollPane(table);
+        tableScrollPane.setPreferredSize(new Dimension(780, tableHeight));
+
+        JPanel tablePanel = new JPanel(new BorderLayout());
+        tablePanel.setBackground(BOT_MESSAGE_COLOR);
+        tablePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        tablePanel.add(tableScrollPane, BorderLayout.CENTER);
+
+        chatPanel.add(tablePanel);
+        chatPanel.revalidate();
+        scrollPane.getVerticalScrollBar().setValue(scrollPane.getVerticalScrollBar().getMaximum());
+    }
+
+    private void styleTable(JTable table) {
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setRowHeight(30);
+
+        JTableHeader header = table.getTableHeader();
+        header.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        header.setBackground(PRIMARY_COLOR);
+        header.setForeground(Color.WHITE);
+
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
     }
 
@@ -185,7 +244,7 @@ public class ChatbotApp extends JFrame {
     private int levenshteinDistance(String a, String b) {
         int[][] dp = new int[a.length() + 1][b.length() + 1];
         for (int i = 0; i <= a.length(); i++) {
-            for (int j = 0; j <= b.length(); j++) {
+            for (int j = 0; j <= b.length(); j++) { // Fixed loop condition here
                 if (i == 0) {
                     dp[i][j] = j;
                 } else if (j == 0) {
@@ -212,9 +271,9 @@ public class ChatbotApp extends JFrame {
                 if (data.classIndex() == -1) {
                     data.setClassIndex(data.numAttributes() - 1);
                 }
-                chatArea.append("Bot: Dataset loaded successfully.\n");
+                addMessageToChat("Dataset loaded successfully.", false);
             } catch (Exception e) {
-                chatArea.append("Bot: Error loading dataset. Please check the path and format.\n");
+                addMessageToChat("Error loading dataset. Please check the path and format.", false);
                 e.printStackTrace();
             }
         }
@@ -252,52 +311,61 @@ public class ChatbotApp extends JFrame {
             frame.add(visualizePanel, BorderLayout.CENTER);
             frame.setVisible(true);
         } catch (Exception e) {
-            chatArea.append("Error generating scatter plot.\n");
+            addMessageToChat("Error generating scatter plot.", false);
             e.printStackTrace();
         }
     }
 
     private void displayAllColumnStats(Instances data) {
+        String[][] statsData = new String[data.numAttributes()][];
+        String[] columnNames = { "Attribute", "Type", "Minimum", "Maximum", "Mean", "Std Dev" };
         for (int i = 0; i < data.numAttributes(); i++) {
-            chatArea.append("\n***** Attribute " + (i + 1) + ": " + data.attribute(i).name() + " *****\n");
+            String[] statsRow = new String[6];
+            statsRow[0] = data.attribute(i).name();
             if (data.attribute(i).isNumeric()) {
                 double[] stats = calculateColumnStats(data, i);
-                chatArea.append("Type: Numeric\n");
-                chatArea.append("Minimum: " + stats[0] + "\n");
-                chatArea.append("Maximum: " + stats[1] + "\n");
-                chatArea.append("Mean: " + stats[2] + "\n");
-                chatArea.append("Standard Deviation: " + stats[3] + "\n");
+                statsRow[1] = "Numeric";
+                statsRow[2] = String.valueOf(stats[0]);
+                statsRow[3] = String.valueOf(stats[1]);
+                statsRow[4] = String.valueOf(stats[2]);
+                statsRow[5] = String.valueOf(stats[3]);
             } else {
-                chatArea.append("Type: Nominal\n");
-                chatArea.append("Distinct Values: " + data.attributeStats(i).nominalCounts.length + "\n");
+                statsRow[1] = "Nominal";
+                statsRow[2] = "-";
+                statsRow[3] = "-";
+                statsRow[4] = "-";
+                statsRow[5] = String.valueOf(data.attributeStats(i).nominalCounts.length);
             }
+            statsData[i] = statsRow;
         }
+        addTableToChat(statsData, columnNames);
     }
 
     private void compareTwoColumns(Instances data) {
-        chatArea.append("\n***** Column Indices and Names *****\n");
+        StringBuilder comparisonBuilder = new StringBuilder();
+        comparisonBuilder.append("\n***** Column Indices and Names *****\n");
         for (int i = 0; i < data.numAttributes(); i++) {
-            chatArea.append("Index " + i + ": " + data.attribute(i).name() + "\n");
+            comparisonBuilder.append("Index ").append(i).append(": ").append(data.attribute(i).name()).append("\n");
         }
         int column1Index = Integer.parseInt(JOptionPane.showInputDialog(this,
                 "Enter the index of the first column to compare:"));
         int column2Index = Integer.parseInt(JOptionPane.showInputDialog(this,
                 "Enter the index of the second column to compare:"));
         if (!data.attribute(column1Index).isNumeric() || !data.attribute(column2Index).isNumeric()) {
-            chatArea.append("Error: Both columns must be numeric for comparison.\n");
+            addMessageToChat("Error: Both columns must be numeric for comparison.", false);
             return;
         }
         double[] stats1 = calculateColumnStats(data, column1Index);
         double[] stats2 = calculateColumnStats(data, column2Index);
-        chatArea.append("\n***** Column Comparison *****\n");
-        chatArea.append(String.format("Minimum:  %s = %.1f, %s = %.1f\n", data.attribute(column1Index).name(),
-                stats1[0], data.attribute(column2Index).name(), stats2[0]));
-        chatArea.append(String.format("Maximum:  %s = %.1f, %s = %.1f\n", data.attribute(column1Index).name(),
-                stats1[1], data.attribute(column2Index).name(), stats2[1]));
-        chatArea.append(String.format("Mean:     %s = %.3f, %s = %.3f\n", data.attribute(column1Index).name(),
-                stats1[2], data.attribute(column2Index).name(), stats2[2]));
-        chatArea.append(String.format("Std Dev:  %s = %.3f, %s = %.3f\n", data.attribute(column1Index).name(),
-                stats1[3], data.attribute(column2Index).name(), stats2[3]));
+        String[][] comparisonData = {
+                { "Minimum", String.valueOf(stats1[0]), String.valueOf(stats2[0]) },
+                { "Maximum", String.valueOf(stats1[1]), String.valueOf(stats2[1]) },
+                { "Mean", String.valueOf(stats1[2]), String.valueOf(stats2[2]) },
+                { "Std Dev", String.valueOf(stats1[3]), String.valueOf(stats2[3]) }
+        };
+        String[] columnNames = { "Statistic", data.attribute(column1Index).name(),
+                data.attribute(column2Index).name() };
+        addTableToChat(comparisonData, columnNames);
     }
 
     private double[] calculateColumnStats(Instances data, int columnIndex) {
@@ -332,49 +400,61 @@ public class ChatbotApp extends JFrame {
                 }
             }
         }
+
         for (int i = 0; i < datasets.size(); i++) {
-            chatArea.append("\nColumn Names for Dataset " + (i + 1) + ":\n");
+            addMessageToChat("Column Names for Dataset " + (i + 1) + ":", false);
+            String[][] columnData = new String[datasets.get(i).numAttributes()][2];
             for (int j = 0; j < datasets.get(i).numAttributes(); j++) {
-                chatArea.append("Index " + j + ": " + datasets.get(i).attribute(j).name() + "\n");
+                columnData[j][0] = String.valueOf(j);
+                columnData[j][1] = datasets.get(i).attribute(j).name();
             }
+            String[] columnNames = { "Index", "Name" };
+            addTableToChat(columnData, columnNames);
         }
+
         int numOfColumns = Integer
                 .parseInt(JOptionPane.showInputDialog(this, "How many column comparisons would you like to do?"));
         for (int i = 0; i < numOfColumns; i++) {
-            chatArea.append("\nComparison Pair " + (i + 1) + ":\n");
+            addMessageToChat("Comparison Pair " + (i + 1) + ":", false);
+
             List<Integer> datasetIndices = new ArrayList<>();
             List<Integer> columnIndices = new ArrayList<>();
+
             int numOfColumnsToCompare = Integer.parseInt(
                     JOptionPane.showInputDialog(this, "How many columns would you like to compare in this pair?"));
             for (int j = 0; j < numOfColumnsToCompare; j++) {
                 int datasetIndex = Integer.parseInt(JOptionPane.showInputDialog(this,
                         "Enter the dataset index (1-" + numDatasets + ") for the column:")) - 1;
                 datasetIndices.add(datasetIndex);
+
                 int columnIndex = Integer.parseInt(JOptionPane.showInputDialog(this,
                         "Enter the column index in dataset " + (datasetIndex + 1) + ":"));
                 columnIndices.add(columnIndex);
             }
+
+            String[][] comparisonData = new String[numOfColumnsToCompare][5];
             for (int j = 0; j < numOfColumnsToCompare; j++) {
                 if (datasetIndices.get(j) < 0 || datasetIndices.get(j) >= numDatasets || columnIndices.get(j) < 0
                         || columnIndices.get(j) >= datasets.get(datasetIndices.get(j)).numAttributes()) {
-                    chatArea.append("Error: Invalid dataset or column index.\n");
+                    addMessageToChat("Error: Invalid dataset or column index.", false);
                     return;
                 }
+
                 if (!datasets.get(datasetIndices.get(j)).attribute(columnIndices.get(j)).isNumeric()) {
-                    chatArea.append("Error: All columns must be numeric for comparison.\n");
+                    addMessageToChat("Error: All columns must be numeric for comparison.", false);
                     return;
                 }
-            }
-            for (int j = 0; j < numOfColumnsToCompare; j++) {
+
                 double[] stats = calculateColumnStats(datasets.get(datasetIndices.get(j)), columnIndices.get(j));
-                chatArea.append("\nColumn " + (j + 1) + ": "
-                        + datasets.get(datasetIndices.get(j)).attribute(columnIndices.get(j)).name() + " (Dataset "
-                        + (datasetIndices.get(j) + 1) + ")\n");
-                chatArea.append("Minimum: " + stats[0] + "\n");
-                chatArea.append("Maximum: " + stats[1] + "\n");
-                chatArea.append("Mean: " + stats[2] + "\n");
-                chatArea.append("Standard Deviation: " + stats[3] + "\n");
+                comparisonData[j][0] = datasets.get(datasetIndices.get(j)).attribute(columnIndices.get(j)).name()
+                        + " (Dataset " + (datasetIndices.get(j) + 1) + ")";
+                comparisonData[j][1] = String.valueOf(stats[0]);
+                comparisonData[j][2] = String.valueOf(stats[1]);
+                comparisonData[j][3] = String.valueOf(stats[2]);
+                comparisonData[j][4] = String.valueOf(stats[3]);
             }
+            String[] columnNames = { "Column", "Minimum", "Maximum", "Mean", "Std Dev" };
+            addTableToChat(comparisonData, columnNames);
         }
     }
 
@@ -391,21 +471,23 @@ public class ChatbotApp extends JFrame {
                 if (newData.classIndex() == -1 && newData.numAttributes() > 0) {
                     newData.setClassIndex(newData.numAttributes() - 1);
                 }
-                chatArea.append("Predictions for the new unlabelled dataset:\n");
+                StringBuilder predictionsBuilder = new StringBuilder();
+                predictionsBuilder.append("Predictions for the new unlabelled dataset:\n");
                 for (int i = 0; i < newData.numInstances(); i++) {
                     double predictedClass = j48Classifier.classifyInstance(newData.instance(i));
-                    chatArea.append("Instance " + (i + 1) + ": Predicted class - "
-                            + data.classAttribute().value((int) predictedClass) + "\n");
+                    predictionsBuilder.append("Instance ").append(i + 1).append(": Predicted class - ")
+                            .append(data.classAttribute().value((int) predictedClass)).append("\n");
                 }
                 Evaluation eval = new Evaluation(data);
                 eval.evaluateModel(j48Classifier, newData);
                 int response = JOptionPane.showConfirmDialog(this, "Do you want to see evaluation metrics?",
                         "Evaluation Metrics", JOptionPane.YES_NO_OPTION);
                 if (response == JOptionPane.YES_OPTION) {
-                    chatArea.append(eval.toSummaryString() + "\n");
-                    chatArea.append(eval.toMatrixString() + "\n");
-                    chatArea.append(eval.toClassDetailsString() + "\n");
+                    predictionsBuilder.append(eval.toSummaryString()).append("\n");
+                    predictionsBuilder.append(eval.toMatrixString()).append("\n");
+                    predictionsBuilder.append(eval.toClassDetailsString()).append("\n");
                 }
+                addMessageToChat(predictionsBuilder.toString(), false);
             } catch (Exception e) {
                 e.printStackTrace();
             }
